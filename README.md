@@ -15,6 +15,29 @@ See [faq](https://github.com/gokcehan/lf/wiki/FAQ) for more information and [tut
 ![multicol-screenshot](http://i.imgur.com/DaTUenu.png)
 ![singlecol-screenshot](http://i.imgur.com/p95xzUj.png)
 
+This is my fork of `lf` which basically contains new features that I make for myself or merged to lf.
+This repo basically contains the syntax for opening programs directly instead of always opening a new shell.
+ex:
+
+```
+map e @{{
+    # this will open neovim directly
+    nvim $f
+}}
+```
+
+the recognized variables are
+`$fs`, `$fx`, `$PWD`
+
+if any other variable specified with `$` then the value will be from environment. For example this will get the value for `EDITOR`
+from the environment.
+```
+map e @{{
+    # this will open the EDITOR directly
+    $EDITOR $f
+}}
+```
+
 ## Features
 
 - Cross-platform (Linux, macOS, BSDs, Windows)
