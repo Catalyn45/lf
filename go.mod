@@ -12,6 +12,7 @@ require (
 
 require (
 	github.com/gdamore/encoding v1.0.0 // indirect
+	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
 	golang.org/x/text v0.14.0 // indirect

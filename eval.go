@@ -1786,6 +1786,11 @@ func (e *callExpr) eval(app *app, args []string) {
 			app.ui.cmdPrefix = ""
 			app.cmdHistory = append(app.cmdHistory, cmdItem{"$", s})
 			app.runShell(s, nil, "$")
+		case "@":
+			log.Printf("direct: %s", s)
+			app.ui.cmdPrefix = ""
+			app.cmdHistory = append(app.cmdHistory, cmdItem{"@", s})
+			app.runShell(s, nil, "@")
 		case "%":
 			log.Printf("shell-pipe: %s", s)
 			app.cmdHistory = append(app.cmdHistory, cmdItem{"%", s})
@@ -2165,6 +2170,9 @@ func (e *callExpr) eval(app *app, args []string) {
 func (e *execExpr) eval(app *app, args []string) {
 	switch e.prefix {
 	case "$":
+		log.Printf("shell: %s -- %s", e, args)
+		app.runShell(e.value, args, e.prefix)
+	case "@":
 		log.Printf("shell: %s -- %s", e, args)
 		app.runShell(e.value, args, e.prefix)
 	case "%":

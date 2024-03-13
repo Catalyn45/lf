@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/google/shlex"
 	"io"
 	"log"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 )
 
 type cmdItem struct {
@@ -511,12 +513,53 @@ func (app *app) runShell(s string, args []string, prefix string) {
 	gState.data["history"] = listHistory(app.cmdHistory).String()
 	gState.mutex.Unlock()
 
-	cmd := shellCommand(s, args)
+	var cmd *exec.Cmd
+
+	if prefix != "@" {
+		cmd = shellCommand(s, args)
+	} else {
+		selections := app.nav.currSelections()
+
+		tokens, err := shlex.Split(s)
+		if err != nil {
+			panic(err)
+		}
+
+		arguments := make([]string, 0, len(tokens))
+
+		for _, element := range tokens {
+			processed_element := element
+
+			if element == "$PWD" {
+				processed_element = quoteString(app.nav.currDir().path)
+			} else if element == "$f" {
+				processed_element = app.ui.currentFile
+			} else if element == "$fs" {
+				arguments = append(arguments, selections...)
+				continue
+			} else if element == "$fx" {
+				if len(selections) == 0 {
+					processed_element = app.ui.currentFile
+				} else {
+					arguments = append(arguments, selections...)
+					continue
+				}
+			} else if strings.HasPrefix(element, "$") {
+				_, i := utf8.DecodeRuneInString(s)
+				processed_element = os.Getenv(element[i:])
+			}
+
+			arguments = append(arguments, processed_element)
+		}
+
+		arguments = append(arguments, args...)
+		cmd = exec.Command(arguments[0], arguments[1:]...)
+	}
 
 	var out io.Reader
 	var err error
 	switch prefix {
-	case "$", "!":
+	case "$", "!", "@":
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stderr
 		cmd.Stderr = os.Stderr

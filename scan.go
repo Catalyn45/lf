@@ -93,7 +93,7 @@ func isDigit(b byte) bool {
 
 func isPrefix(b byte) bool {
 	switch b {
-	case '$', '%', '!', '&':
+	case '$', '%', '!', '&', '@':
 		return true
 	}
 	return false
