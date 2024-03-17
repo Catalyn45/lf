@@ -62,6 +62,7 @@ var (
 		"push",
 		"read",
 		"shell",
+		"direct",
 		"shell-pipe",
 		"shell-wait",
 		"shell-async",

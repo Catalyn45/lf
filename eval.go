@@ -1397,6 +1397,13 @@ func (e *callExpr) eval(app *app, args []string) {
 		normal(app)
 		app.ui.cmdPrefix = "$"
 		app.ui.loadFileInfo(app.nav)
+	case "direct":
+		if app.ui.cmdPrefix == ">" {
+			return
+		}
+		normal(app)
+		app.ui.cmdPrefix = "@"
+		app.ui.loadFileInfo(app.nav)
 	case "shell-pipe":
 		if app.ui.cmdPrefix == ">" {
 			return
@@ -1974,7 +1981,7 @@ func (e *callExpr) eval(app *app, args []string) {
 	case "cmd-delete-back":
 		if len(app.ui.cmdAccLeft) == 0 {
 			switch app.ui.cmdPrefix {
-			case "!", "$", "%", "&":
+			case "!", "$", "%", "&", "@":
 				app.ui.cmdPrefix = ":"
 			case ">", "rename: ", "filter: ":
 				// Don't mess with programs waiting for input.
@@ -2184,7 +2191,7 @@ func (e *execExpr) eval(app *app, args []string) {
 		log.Printf("shell: %s -- %s", e, args)
 		app.runShell(e.value, args, e.prefix)
 	case "@":
-		log.Printf("shell: %s -- %s", e, args)
+		log.Printf("direct: %s -- %s", e, args)
 		app.runShell(e.value, args, e.prefix)
 	case "%":
 		log.Printf("shell-pipe: %s -- %s", e, args)
