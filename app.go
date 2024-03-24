@@ -381,9 +381,6 @@ func (app *app) loop() {
 			}
 			app.ui.draw(app.nav)
 		case d := <-app.nav.dirChan:
-
-			app.nav.checkDir(d)
-
 			if gOpts.dircache {
 				prev, ok := app.nav.dirCache[d.path]
 				if ok {
@@ -418,8 +415,6 @@ func (app *app) loop() {
 
 			app.ui.draw(app.nav)
 		case r := <-app.nav.regChan:
-			app.nav.checkReg(r)
-
 			app.nav.regCache[r.path] = r
 
 			curr, err := app.nav.currFile()
@@ -489,6 +484,10 @@ func (app *app) runCmdSync(cmd *exec.Cmd, pause_after bool) {
 	}
 
 	app.ui.loadFile(app, true)
+
+	//mark the current directory as updated for refresh
+	app.nav.currDir().updated = true
+
 	app.nav.renew()
 }
 
@@ -565,6 +564,7 @@ func (app *app) runShell(s string, args []string, prefix string) {
 		cmd.Stderr = os.Stderr
 
 		app.runCmdSync(cmd, prefix == "!")
+
 		return
 	}
 
