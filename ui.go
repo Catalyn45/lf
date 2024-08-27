@@ -293,27 +293,27 @@ func fileInfo(f *file, d *dir) string {
 	for _, s := range getInfo(d.path) {
 		switch s {
 		case "size":
-			if !(f.IsDir() && gOpts.dircounts) {
-				var sz string
-				if f.IsDir() && f.dirSize < 0 {
-					sz = "-"
-				} else {
-					sz = humanize(f.TotalSize())
+			if f.IsDir() && gOpts.dircounts {
+				switch {
+				case f.dirCount < -1:
+					info = fmt.Sprintf("%s    !", info)
+				case f.dirCount < 0:
+					info = fmt.Sprintf("%s    ?", info)
+				case f.dirCount < 1000:
+					info = fmt.Sprintf("%s %4d", info, f.dirCount)
+				default:
+					info = fmt.Sprintf("%s 999+", info)
 				}
-				info = fmt.Sprintf("%s %4s", info, sz)
 				continue
 			}
 
-			switch {
-			case f.dirCount < -1:
-				info = fmt.Sprintf("%s    !", info)
-			case f.dirCount < 0:
-				info = fmt.Sprintf("%s    ?", info)
-			case f.dirCount < 1000:
-				info = fmt.Sprintf("%s %4d", info, f.dirCount)
-			default:
-				info = fmt.Sprintf("%s 999+", info)
+			var sz string
+			if f.IsDir() && f.dirSize < 0 {
+				sz = "-"
+			} else {
+				sz = humanize(f.TotalSize())
 			}
+			info = fmt.Sprintf("%s %4s", info, sz)
 		case "time":
 			info = fmt.Sprintf("%s %*s", info, max(len(gOpts.infotimefmtnew), len(gOpts.infotimefmtold)), infotimefmt(f.ModTime()))
 		case "atime":
@@ -392,7 +392,7 @@ func (win *win) printDir(ui *ui, dir *dir, context *dirContext, dirStyle *dirSty
 
 	var lnwidth int
 
-	if gOpts.number || gOpts.relativenumber {
+	if dirStyle.role == Active && (gOpts.number || gOpts.relativenumber) {
 		lnwidth = 1
 		if gOpts.number && gOpts.relativenumber {
 			lnwidth++
@@ -445,17 +445,21 @@ func (win *win) printDir(ui *ui, dir *dir, context *dirContext, dirStyle *dirSty
 			maxWidth -= 1
 		}
 
-		var s []rune
-
-		// leave space for displaying the tag
-		s = append(s, ' ')
-
-		if gOpts.icons {
-			s = append(s, []rune(dirStyle.icons.get(f))...)
-			s = append(s, ' ')
+		tag := " "
+		if val, ok := context.tags[path]; ok && len(val) > 0 {
+			tag = val
 		}
 
-		maxFilenameWidth := maxWidth - runeSliceWidth(s)
+		var icon []rune
+		var iconDef iconDef
+		if gOpts.icons {
+			iconDef = dirStyle.icons.get(f)
+			icon = append(icon, []rune(iconDef.icon)...)
+			icon = append(icon, ' ')
+		}
+
+		// subtract space for tag and icon
+		maxFilenameWidth := maxWidth - 1 - runeSliceWidth(icon)
 
 		info := fileInfo(f, dir)
 		showInfo := len(info) > 0 && 2*len(info) < maxWidth
@@ -471,39 +475,46 @@ func (win *win) printDir(ui *ui, dir *dir, context *dirContext, dirStyle *dirSty
 			filename = append(filename, []rune(gOpts.truncatechar)...)
 			filename = append(filename, lastPart...)
 		}
-		for i := runeSliceWidth(filename); i < maxFilenameWidth; i++ {
+		for j := runeSliceWidth(filename); j < maxFilenameWidth; j++ {
 			filename = append(filename, ' ')
 		}
-		s = append(s, filename...)
 
 		if showInfo {
-			s = append(s, []rune(info)...)
+			filename = append(filename, []rune(info)...)
 		}
 
-		ce := ""
-		if i == dir.pos && (ui.focused || !gOpts.hidecursorinactive) {
+		if i == dir.pos {
+			var cursorFmt string
 			switch dirStyle.role {
 			case Active:
-				ce = gOpts.cursoractivefmt
+				cursorFmt = optionToFmtstr(gOpts.cursoractivefmt)
 			case Parent:
-				ce = gOpts.cursorparentfmt
+				cursorFmt = optionToFmtstr(gOpts.cursorparentfmt)
 			case Preview:
-				ce = gOpts.cursorpreviewfmt
+				cursorFmt = optionToFmtstr(gOpts.cursorpreviewfmt)
 			}
-		}
-		cursorescapefmt := optionToFmtstr(ce)
 
-		s = append(s, ' ')
-		styledFilename := fmt.Sprintf(cursorescapefmt, string(s))
-		win.print(ui.screen, lnwidth+1, i, st, styledFilename)
+			// print tag separately as it can contain color escape sequences
+			win.print(ui.screen, lnwidth+1, i, st, fmt.Sprintf(cursorFmt, tag))
 
-		tag, ok := context.tags[path]
-		if ok {
-			if i == dir.pos {
-				win.print(ui.screen, lnwidth+1, i, st, fmt.Sprintf(cursorescapefmt, tag))
-			} else {
-				win.print(ui.screen, lnwidth+1, i, tcell.StyleDefault, fmt.Sprintf(optionToFmtstr(gOpts.tagfmt), tag))
+			line := append(icon, filename...)
+			line = append(line, ' ')
+			win.print(ui.screen, lnwidth+2, i, st, fmt.Sprintf(cursorFmt, string(line)))
+		} else {
+			if tag != " " {
+				tagStr := fmt.Sprintf(optionToFmtstr(gOpts.tagfmt), tag)
+				win.print(ui.screen, lnwidth+1, i, tcell.StyleDefault, tagStr)
 			}
+
+			if len(icon) > 0 {
+				iconStyle := st
+				if iconDef.hasStyle {
+					iconStyle = iconDef.style
+				}
+				win.print(ui.screen, lnwidth+2, i, iconStyle, string(icon))
+			}
+
+			win.print(ui.screen, lnwidth+2+runeSliceWidth(icon), i, st, string(filename))
 		}
 	}
 }
@@ -557,7 +568,6 @@ type ui struct {
 	screen      tcell.Screen
 	sxScreen    sixelScreen
 	polling     bool
-	focused     bool
 	wins        []*win
 	promptWin   *win
 	msgWin      *win
@@ -589,7 +599,6 @@ func newUI(screen tcell.Screen) *ui {
 	ui := &ui{
 		screen:      screen,
 		polling:     true,
-		focused:     true,
 		wins:        getWins(screen),
 		promptWin:   newWin(wtot, 1, 0, 0),
 		msgWin:      newWin(wtot, 1, 0, htot-1),
@@ -778,11 +787,11 @@ func (ui *ui) drawPromptLine(nav *nav) {
 
 	var prompt string
 
-	prompt = strings.Replace(gOpts.promptfmt, "%u", gUser.Username, -1)
-	prompt = strings.Replace(prompt, "%h", gHostname, -1)
-	prompt = strings.Replace(prompt, "%f", fname, -1)
+	prompt = strings.ReplaceAll(gOpts.promptfmt, "%u", gUser.Username)
+	prompt = strings.ReplaceAll(prompt, "%h", gHostname)
+	prompt = strings.ReplaceAll(prompt, "%f", fname)
 
-	if printLength(strings.Replace(strings.Replace(prompt, "%w", pwd, -1), "%d", pwd, -1)) > ui.promptWin.w {
+	if printLength(strings.ReplaceAll(strings.ReplaceAll(prompt, "%w", pwd), "%d", pwd)) > ui.promptWin.w {
 		names := strings.Split(pwd, sep)
 		for i := range names {
 			if names[i] == "" {
@@ -790,23 +799,23 @@ func (ui *ui) drawPromptLine(nav *nav) {
 			}
 			r, _ := utf8.DecodeRuneInString(names[i])
 			names[i] = string(r)
-			if printLength(strings.Replace(strings.Replace(prompt, "%w", strings.Join(names, sep), -1), "%d", strings.Join(names, sep), -1)) <= ui.promptWin.w {
+			if printLength(strings.ReplaceAll(strings.ReplaceAll(prompt, "%w", strings.Join(names, sep)), "%d", strings.Join(names, sep))) <= ui.promptWin.w {
 				break
 			}
 		}
 		pwd = strings.Join(names, sep)
 	}
 
-	prompt = strings.Replace(prompt, "%w", pwd, -1)
+	prompt = strings.ReplaceAll(prompt, "%w", pwd)
 	if !strings.HasSuffix(pwd, sep) {
 		pwd += sep
 	}
-	prompt = strings.Replace(prompt, "%d", pwd, -1)
+	prompt = strings.ReplaceAll(prompt, "%d", pwd)
 
 	if len(dir.filter) != 0 {
-		prompt = strings.Replace(prompt, "%F", fmt.Sprint(dir.filter), -1)
+		prompt = strings.ReplaceAll(prompt, "%F", fmt.Sprint(dir.filter))
 	} else {
-		prompt = strings.Replace(prompt, "%F", "", -1)
+		prompt = strings.ReplaceAll(prompt, "%F", "")
 	}
 
 	// spacer
@@ -814,7 +823,7 @@ func (ui *ui) drawPromptLine(nav *nav) {
 	if avail > 0 {
 		prompt = strings.Replace(prompt, "%S", strings.Repeat(" ", avail), 1)
 	}
-	prompt = strings.Replace(prompt, "%S", "", -1)
+	prompt = strings.ReplaceAll(prompt, "%S", "")
 
 	ui.promptWin.print(ui.screen, 0, 0, st, prompt)
 }
@@ -843,8 +852,6 @@ func (ui *ui) drawRuler(nav *nav) {
 	hid := len(dir.allFiles) - tot
 	acc := string(ui.keyCount) + string(ui.keyAcc)
 
-	selection := []string{}
-
 	copy := 0
 	move := 0
 	if len(nav.saves) > 0 {
@@ -855,21 +862,9 @@ func (ui *ui) drawRuler(nav *nav) {
 				move++
 			}
 		}
-		if copy > 0 {
-			copyStr := fmt.Sprintf(optionToFmtstr(gOpts.copyfmt), fmt.Sprintf(" %d ", copy))
-			selection = append(selection, copyStr)
-		}
-		if move > 0 {
-			moveStr := fmt.Sprintf(optionToFmtstr(gOpts.cutfmt), fmt.Sprintf(" %d ", move))
-			selection = append(selection, moveStr)
-		}
 	}
 
 	currSelections := nav.currSelections()
-	if len(currSelections) > 0 {
-		selectStr := fmt.Sprintf(optionToFmtstr(gOpts.selectfmt), fmt.Sprintf(" %d ", len(currSelections)))
-		selection = append(selection, selectStr)
-	}
 
 	progress := []string{}
 
@@ -887,39 +882,6 @@ func (ui *ui) drawRuler(nav *nav) {
 	}
 
 	opts := getOptsMap()
-
-	// 'ruler' option is deprecated and can be removed in future
-	if len(gOpts.ruler) > 0 {
-		ruler := []string{}
-		for _, s := range gOpts.ruler {
-			switch s {
-			case "df":
-				df := diskFree(dir.path)
-				if df != "" {
-					ruler = append(ruler, df)
-				}
-			case "acc":
-				ruler = append(ruler, acc)
-			case "progress":
-				ruler = append(ruler, progress...)
-			case "selection":
-				ruler = append(ruler, selection...)
-			case "filter":
-				if len(dir.filter) != 0 {
-					ruler = append(ruler, "\033[34;7m F \033[0m")
-				}
-			case "ind":
-				ruler = append(ruler, fmt.Sprintf("%d/%d", ind, tot))
-			default:
-				if val, ok := opts[s]; ok {
-					ruler = append(ruler, formatRulerOpt(s, val))
-				}
-			}
-		}
-
-		ui.msgWin.printRight(ui.screen, 0, st, strings.Join(ruler, "  "))
-		return
-	}
 
 	rulerfmt := strings.ReplaceAll(gOpts.rulerfmt, "|", "\x1f")
 	rulerfmt = reRulerSub.ReplaceAllStringFunc(rulerfmt, func(s string) string {
@@ -1109,7 +1071,6 @@ func (ui *ui) draw(nav *nav) {
 		ui.sxScreen.lastFile = ui.regPrev.path
 		ui.sxScreen.showSixels()
 	}
-
 }
 
 func findBinds(keys map[string]expr, prefix string) (binds map[string]expr, ok bool) {
@@ -1457,8 +1418,11 @@ func (ui *ui) readNormalEvent(ev tcell.Event, nav *nav) expr {
 	case *tcell.EventInterrupt:
 		log.Printf("Got EventInterrupt: at %s", tev.When())
 	case *tcell.EventFocus:
-		ui.focused = tev.Focused
-		return draw
+		if tev.Focused {
+			return &callExpr{"on-focus-gained", nil, 1}
+		} else {
+			return &callExpr{"on-focus-lost", nil, 1}
+		}
 	}
 	return nil
 }

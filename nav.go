@@ -39,6 +39,84 @@ type file struct {
 	err        error
 }
 
+func newFile(path string) *file {
+	lstat, err := os.Lstat(path)
+
+	if err != nil {
+		log.Printf("getting file information: %s", err)
+		return &file{
+			FileInfo:   &fakeStat{name: filepath.Base(path)},
+			linkState:  notLink,
+			linkTarget: "",
+			path:       path,
+			dirCount:   -1,
+			dirSize:    -1,
+			accessTime: time.Unix(0, 0),
+			changeTime: time.Unix(0, 0),
+			ext:        "",
+			err:        err,
+		}
+	}
+
+	var linkState linkState
+	var linkTarget string
+
+	if lstat.Mode()&os.ModeSymlink != 0 {
+		stat, err := os.Stat(path)
+		if err == nil {
+			linkState = working
+			lstat = stat
+		} else {
+			linkState = broken
+		}
+		linkTarget, err = os.Readlink(path)
+		if err != nil {
+			log.Printf("reading link target: %s", err)
+		}
+	}
+
+	ts := times.Get(lstat)
+	at := ts.AccessTime()
+	var ct time.Time
+	// from times docs: ChangeTime() panics unless HasChangeTime() is true
+	if ts.HasChangeTime() {
+		ct = ts.ChangeTime()
+	} else {
+		// fall back to ModTime if ChangeTime cannot be determined
+		ct = lstat.ModTime()
+	}
+
+	dirCount := -1
+	if lstat.IsDir() && gOpts.dircounts {
+		d, err := os.Open(path)
+		if err != nil {
+			dirCount = -2
+		} else {
+			names, err := d.Readdirnames(1000)
+			d.Close()
+
+			if names == nil && err != io.EOF {
+				dirCount = -2
+			} else {
+				dirCount = len(names)
+			}
+		}
+	}
+
+	return &file{
+		FileInfo:   lstat,
+		linkState:  linkState,
+		linkTarget: linkTarget,
+		path:       path,
+		dirCount:   dirCount,
+		dirSize:    -1,
+		accessTime: at,
+		changeTime: ct,
+		ext:        getFileExtension(lstat),
+		err:        nil,
+	}
+}
+
 func (file *file) TotalSize() int64 {
 	if file.IsDir() {
 		if file.dirSize >= 0 {
@@ -55,7 +133,7 @@ type fakeStat struct {
 
 func (fs *fakeStat) Name() string       { return fs.name }
 func (fs *fakeStat) Size() int64        { return 0 }
-func (fs *fakeStat) Mode() os.FileMode  { return os.FileMode(0000) }
+func (fs *fakeStat) Mode() os.FileMode  { return os.FileMode(0o000) }
 func (fs *fakeStat) ModTime() time.Time { return time.Unix(0, 0) }
 func (fs *fakeStat) IsDir() bool        { return false }
 func (fs *fakeStat) Sys() any           { return nil }
@@ -70,91 +148,7 @@ func readdir(path string) ([]*file, error) {
 
 	files := make([]*file, 0, len(names))
 	for _, fname := range names {
-		fpath := filepath.Join(path, fname)
-
-		lstat, err := os.Lstat(fpath)
-
-		if os.IsNotExist(err) {
-			continue
-		}
-		if err != nil {
-			log.Printf("getting file information: %s", err)
-			files = append(files, &file{
-				FileInfo:   &fakeStat{name: fname},
-				linkState:  notLink,
-				linkTarget: "",
-				path:       fpath,
-				dirCount:   -1,
-				dirSize:    -1,
-				accessTime: time.Unix(0, 0),
-				changeTime: time.Unix(0, 0),
-				ext:        filepath.Ext(fpath),
-				err:        err,
-			})
-			continue
-		}
-
-		var linkState linkState
-		var linkTarget string
-
-		if lstat.Mode()&os.ModeSymlink != 0 {
-			stat, err := os.Stat(fpath)
-			if err == nil {
-				linkState = working
-				lstat = stat
-			} else {
-				linkState = broken
-			}
-			linkTarget, err = os.Readlink(fpath)
-			if err != nil {
-				log.Printf("reading link target: %s", err)
-			}
-		}
-
-		ts := times.Get(lstat)
-		at := ts.AccessTime()
-		var ct time.Time
-		// from times docs: ChangeTime() panics unless HasChangeTime() is true
-		if ts.HasChangeTime() {
-			ct = ts.ChangeTime()
-		} else {
-			// fall back to ModTime if ChangeTime cannot be determined
-			ct = lstat.ModTime()
-		}
-
-		// returns an empty string if extension could not be determined
-		// i.e. directories, filenames without extensions
-		ext := filepath.Ext(fpath)
-
-		dirCount := -1
-		if lstat.IsDir() && gOpts.dircounts {
-			d, err := os.Open(fpath)
-			if err != nil {
-				dirCount = -2
-			} else {
-				names, err := d.Readdirnames(1000)
-				d.Close()
-
-				if names == nil && err != io.EOF {
-					dirCount = -2
-				} else {
-					dirCount = len(names)
-				}
-			}
-		}
-
-		files = append(files, &file{
-			FileInfo:   lstat,
-			linkState:  linkState,
-			linkTarget: linkTarget,
-			path:       fpath,
-			dirCount:   dirCount,
-			dirSize:    -1,
-			accessTime: at,
-			changeTime: ct,
-			ext:        ext,
-			err:        nil,
-		})
+		files = append(files, newFile(filepath.Join(path, fname)))
 	}
 
 	return files, err
@@ -179,7 +173,6 @@ type dir struct {
 	ignoredia   bool       // ignoredia value from last sort
 	noPerm      bool       // whether lf has no permission to open the directory
 	lines       []string   // lines of text to display if directory previews are enabled
-	updated     bool       // directory has been updated after last dirCheck
 }
 
 func newDir(path string) *dir {
@@ -445,6 +438,8 @@ type nav struct {
 	dirPreviewChan  chan *dir
 	dirChan         chan *dir
 	regChan         chan *reg
+	fileChan        chan *file
+	delChan         chan string
 	dirCache        map[string]*dir
 	regCache        map[string]*reg
 	saves           map[string]bool
@@ -493,7 +488,6 @@ func (nav *nav) loadDirInternal(path string) *dir {
 			nav.dirPreviewChan <- d
 		}
 		nav.dirChan <- d
-
 	}()
 	return d
 }
@@ -522,7 +516,7 @@ func (nav *nav) checkDir(dir *dir) {
 	}
 
 	switch {
-	case s.ModTime().After(dir.loadTime) || dir.updated:
+	case s.ModTime().After(dir.loadTime):
 		now := time.Now()
 
 		// XXX: Linux builtin exFAT drivers are able to predict modifications in the future
@@ -536,8 +530,6 @@ func (nav *nav) checkDir(dir *dir) {
 		dir.loadTime = now
 		go func() {
 			nd := newDir(dir.path)
-			nd.filter = dir.filter
-			nd.sort()
 			if gOpts.dirpreviews {
 				nav.dirPreviewChan <- nd
 			}
@@ -593,6 +585,8 @@ func newNav(height int) *nav {
 		dirPreviewChan:  make(chan *dir, 1024),
 		dirChan:         make(chan *dir),
 		regChan:         make(chan *reg),
+		fileChan:        make(chan *file),
+		delChan:         make(chan string),
 		dirCache:        make(map[string]*dir),
 		regCache:        make(map[string]*reg),
 		saves:           make(map[string]bool),
@@ -757,7 +751,6 @@ func (nav *nav) previewLoop(ui *ui) {
 	}
 }
 
-//lint:ignore U1000 This function is not used on Windows
 func matchPattern(pattern, name, path string) bool {
 	s := name
 
@@ -774,7 +767,6 @@ func matchPattern(pattern, name, path string) bool {
 }
 
 func (nav *nav) previewDir(dir *dir, win *win) {
-
 	defer func() {
 		dir.loading = false
 		nav.dirChan <- dir
@@ -830,11 +822,9 @@ func (nav *nav) previewDir(dir *dir, win *win) {
 			log.Printf("loading dir: %s", buf.Err())
 		}
 	}
-
 }
 
 func (nav *nav) preview(path string, win *win) {
-
 	reg := &reg{loadTime: time.Now(), path: path}
 	defer func() { nav.regChan <- reg }()
 
@@ -899,25 +889,29 @@ func (nav *nav) preview(path string, win *win) {
 
 	// bufio.Scanner can't handle files containing long lines if they exceed the
 	// size of its internal buffer
-	addLine := true
+	line := []byte{}
 	for len(reg.lines) < win.h {
-		line, isPrefix, err := reader.ReadLine()
+		bytes, isPrefix, err := reader.ReadLine()
 		if err != nil {
+			if len(line) > 0 {
+				reg.lines = append(reg.lines, string(line))
+			}
 			break
 		}
 
-		for _, r := range line {
-			if r == 0 {
+		for _, byte := range bytes {
+			if byte == 0 {
 				reg.lines = []string{"\033[7mbinary\033[0m"}
 				return
 			}
 		}
 
-		if addLine {
-			reg.lines = append(reg.lines, string(line))
-		}
+		line = append(line, bytes...)
 
-		addLine = !isPrefix
+		if !isPrefix {
+			reg.lines = append(reg.lines, string(line))
+			line = []byte{}
+		}
 	}
 }
 
@@ -1373,8 +1367,6 @@ loop:
 	if errCount == 0 {
 		app.ui.exprChan <- &callExpr{"echo", []string{"\033[0;32mCopied successfully\033[0m"}, 1}
 	}
-	//mark the current directory as updated for refresh
-	nav.currDir().updated = true
 }
 
 func (nav *nav) moveAsync(app *app, srcs []string, dstDir string) {
@@ -1411,7 +1403,7 @@ func (nav *nav) moveAsync(app *app, srcs []string, dstDir string) {
 			app.ui.exprChan <- echo
 			continue
 		} else if !os.IsNotExist(err) {
-			ext := filepath.Ext(file)
+			ext := getFileExtension(dstStat)
 			basename := file[:len(file)-len(ext)]
 			var newPath string
 			for i := 1; !os.IsNotExist(err); i++ {
@@ -1488,8 +1480,6 @@ func (nav *nav) moveAsync(app *app, srcs []string, dstDir string) {
 		app.ui.exprChan <- &callExpr{"clear", nil, 1}
 		app.ui.exprChan <- &callExpr{"echo", []string{"\033[0;32mMoved successfully\033[0m"}, 1}
 	}
-	//mark the current directory as updated for refresh
-	nav.currDir().updated = true
 }
 
 func (nav *nav) paste(app *app) error {
@@ -1574,7 +1564,13 @@ func (nav *nav) rename() error {
 	dir := nav.loadDir(filepath.Dir(newPath))
 
 	if dir.loading {
-		dir.files = append(dir.files, &file{FileInfo: lstat})
+		for i := range dir.allFiles {
+			if dir.allFiles[i].path == oldPath {
+				dir.allFiles[i] = &file{FileInfo: lstat}
+				break
+			}
+		}
+		dir.sort()
 	}
 
 	dir.sel(lstat.Name(), nav.height)
@@ -1897,7 +1893,7 @@ func (nav *nav) writeMarks() error {
 	sort.Strings(keys)
 
 	for _, k := range keys {
-		_, err = f.WriteString(fmt.Sprintf("%s:%s\n", k, nav.marks[k]))
+		_, err = fmt.Fprintf(f, "%s:%s\n", k, nav.marks[k])
 		if err != nil {
 			return fmt.Errorf("writing marks file: %s", err)
 		}
@@ -1958,7 +1954,7 @@ func (nav *nav) writeTags() error {
 	sort.Strings(keys)
 
 	for _, k := range keys {
-		_, err = f.WriteString(fmt.Sprintf("%s:%s\n", k, nav.tags[k]))
+		_, err = fmt.Fprintf(f, "%s:%s\n", k, nav.tags[k])
 		if err != nil {
 			return fmt.Errorf("writing tags file: %s", err)
 		}
@@ -1996,7 +1992,6 @@ func (m indexedSelections) Swap(i, j int) {
 func (m indexedSelections) Less(i, j int) bool { return m.indices[i] < m.indices[j] }
 
 func (nav *nav) currSelections() []string {
-
 	currDirOnly := gOpts.selmode == "dir"
 	currDirPath := ""
 	if currDirOnly {

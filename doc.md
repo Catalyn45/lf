@@ -136,75 +136,74 @@ The following command line commands are provided by lf:
 
 The following options can be used to customize the behavior of lf:
 
-	anchorfind          bool      (default true)
-	autoquit            bool      (default false)
-	borderfmt           string    (default "\033[0m")
-	cleaner             string    (default '')
-	copyfmt             string    (default "\033[7;33m")
-	cursoractivefmt     string    (default "\033[7m")
-	cursorparentfmt     string    (default "\033[7m")
-	cursorpreviewfmt    string    (default "\033[4m")
-	cutfmt              string    (default "\033[7;31m")
-	dircache            bool      (default true)
-	dircounts           bool      (default false)
-	dirfirst            bool      (default true)
-	dironly             bool      (default false)
-	dirpreviews         bool      (default false)
-	drawbox             bool      (default false)
-	dupfilefmt          string    (default '%f.~%n~')
-	errorfmt            string    (default "\033[7;31;47m")
-	filesep             string    (default "\n")
-	findlen             int       (default 1)
-	globfilter          bool      (default false)
-	globsearch          bool      (default false)
-	hidden              bool      (default false)
-	hiddenfiles         []string  (default '.*')
-	hidecursorinactive  bool      (default false)
-	history             bool      (default true)
-	icons               bool      (default false)
-	ifs                 string    (default '')
-	ignorecase          bool      (default true)
-	ignoredia           bool      (default true)
-	incfilter           bool      (default false)
-	incsearch           bool      (default false)
-	info                []string  (default '')
-	infotimefmtnew      string    (default 'Jan _2 15:04')
-	infotimefmtold      string    (default 'Jan _2  2006')
-	mouse               bool      (default false)
-	number              bool      (default false)
-	numberfmt           string    (default "\033[33m")
-	period              int       (default 0)
-	preserve            []string  (default "mode")
-	preview             bool      (default true)
-	previewer           string    (default '')
-	promptfmt           string    (default "\033[32;1m%u@%h\033[0m:\033[34;1m%d\033[0m\033[1m%f\033[0m")
-	ratios              []int     (default '1:2:3')
-	relativenumber      bool      (default false)
-	reverse             bool      (default false)
-	roundbox            bool      (default false)
-	ruler               []string  (default 'acc:progress:selection:filter:ind')
-	rulerfmt            string    (default "  %a|  %p|  \033[7;31m %m \033[0m|  \033[7;33m %c \033[0m|  \033[7;35m %s \033[0m|  \033[7;34m %f \033[0m|  %i/%t")
-	scrolloff           int       (default 0)
-	selectfmt           string    (default "\033[7;35m")
-	selmode             string    (default 'all')
-	shell               string    (default 'sh' for Unix and 'cmd' for Windows)
-	shellflag           string    (default '-c' for Unix and '/c' for Windows)
-	shellopts           []string  (default '')
-	sixel               bool      (default false)
-	smartcase           bool      (default true)
-	smartdia            bool      (default false)
-	sortby              string    (default 'natural')
-	statfmt             string    (default "\033[36m%p\033[0m| %c| %u| %g| %S| %t| -> %l")
-	tabstop             int       (default 8)
-	tagfmt              string    (default "\033[31m")
-	tempmarks           string    (default '')
-	timefmt             string    (default 'Mon Jan _2 15:04:05 2006')
-	truncatechar        string    (default '~')
-	truncatepct         int       (default 100)
-	waitmsg             string    (default 'Press any key to continue')
-	wrapscan            bool      (default true)
-	wrapscroll          bool      (default false)
-	user_{option}       string    (default none)
+	anchorfind        bool      (default true)
+	autoquit          bool      (default false)
+	borderfmt         string    (default "\033[0m")
+	cleaner           string    (default '')
+	copyfmt           string    (default "\033[7;33m")
+	cursoractivefmt   string    (default "\033[7m")
+	cursorparentfmt   string    (default "\033[7m")
+	cursorpreviewfmt  string    (default "\033[4m")
+	cutfmt            string    (default "\033[7;31m")
+	dircache          bool      (default true)
+	dircounts         bool      (default false)
+	dirfirst          bool      (default true)
+	dironly           bool      (default false)
+	dirpreviews       bool      (default false)
+	drawbox           bool      (default false)
+	dupfilefmt        string    (default '%f.~%n~')
+	errorfmt          string    (default "\033[7;31;47m")
+	filesep           string    (default "\n")
+	findlen           int       (default 1)
+	globfilter        bool      (default false)
+	globsearch        bool      (default false)
+	hidden            bool      (default false)
+	hiddenfiles       []string  (default '.*' for Unix and '' for Windows)
+	history           bool      (default true)
+	icons             bool      (default false)
+	ifs               string    (default '')
+	ignorecase        bool      (default true)
+	ignoredia         bool      (default true)
+	incfilter         bool      (default false)
+	incsearch         bool      (default false)
+	info              []string  (default '')
+	infotimefmtnew    string    (default 'Jan _2 15:04')
+	infotimefmtold    string    (default 'Jan _2  2006')
+	mouse             bool      (default false)
+	number            bool      (default false)
+	numberfmt         string    (default "\033[33m")
+	period            int       (default 0)
+	preserve          []string  (default "mode")
+	preview           bool      (default true)
+	previewer         string    (default '')
+	promptfmt         string    (default "\033[32;1m%u@%h\033[0m:\033[34;1m%d\033[0m\033[1m%f\033[0m")
+	ratios            []int     (default '1:2:3')
+	relativenumber    bool      (default false)
+	reverse           bool      (default false)
+	roundbox          bool      (default false)
+	rulerfmt          string    (default "  %a|  %p|  \033[7;31m %m \033[0m|  \033[7;33m %c \033[0m|  \033[7;35m %s \033[0m|  \033[7;34m %f \033[0m|  %i/%t")
+	scrolloff         int       (default 0)
+	selectfmt         string    (default "\033[7;35m")
+	selmode           string    (default 'all')
+	shell             string    (default 'sh' for Unix and 'cmd' for Windows)
+	shellflag         string    (default '-c' for Unix and '/c' for Windows)
+	shellopts         []string  (default '')
+	sixel             bool      (default false)
+	smartcase         bool      (default true)
+	smartdia          bool      (default false)
+	sortby            string    (default 'natural')
+	statfmt           string    (default "\033[36m%p\033[0m| %c| %u| %g| %S| %t| -> %l")
+	tabstop           int       (default 8)
+	tagfmt            string    (default "\033[31m")
+	tempmarks         string    (default '')
+	timefmt           string    (default 'Mon Jan _2 15:04:05 2006')
+	truncatechar      string    (default '~')
+	truncatepct       int       (default 100)
+	waitmsg           string    (default 'Press any key to continue')
+	watch             bool      (default false)
+	wrapscan          bool      (default true)
+	wrapscroll        bool      (default false)
+	user_{option}     string    (default none)
 
 The following environment variables are exported for shell commands:
 
@@ -236,6 +235,8 @@ The following special shell commands are used to customize the behavior of lf wh
 	delete
 	pre-cd
 	on-cd
+	on-focus-gained
+	on-focus-lost
 	on-select
 	on-redraw
 	on-quit
@@ -765,18 +766,14 @@ Otherwise, these characters are interpreted as they are.
 
 Show hidden files.
 On Unix systems, hidden files are determined by the value of `hiddenfiles`.
-On Windows, only files with hidden attributes are considered hidden files.
+On Windows, files with hidden attributes are also considered hidden files.
 
-## hiddenfiles ([]string) (default `.*`)
+## hiddenfiles ([]string) (default `.*` for Unix and `` for Windows)
 
 List of hidden file glob patterns.
 Patterns can be given as relative or absolute paths.
 Globbing supports the usual special characters, `*` to match any sequence, `?` to match any character, and `[...]` or `[^...]` to match character sets or ranges.
 In addition, if a pattern starts with `!`, then its matches are excluded from hidden files. To add multiple patterns, use `:` as a separator. Example: `.*:lost+found:*.bak`
-
-## hidecursorinactive (bool) (default false)
-
-Hide the cursor when the terminal or tmux pane loses focus.
 
 ## history (bool) (default true)
 
@@ -894,20 +891,6 @@ Reverse the direction of sort.
 
 Draw rounded outer corners when the `drawbox` option is enabled.
 
-## ruler ([]string) (default `acc:progress:selection:filter:ind`)
-
-This option is deprecated in favor of using the `rulerfmt` option (see below).
-List of information shown in status line ruler.
-Currently supported information types are `acc`, `progress`, `selection`, `filter`, `ind`, `df` and names starting with `lf_`.
-`acc` shows the pressed keys (e.g. for bindings with multiple key presses or counts given to bindings).
-`progress` shows the progress of file operations (e.g. copying a large directory).
-`selection` shows the number of files that are selected, or designated for being cut/copied.
-`filter` shows `F` if a filter is currently being applied.
-`ind` shows the current position of the cursor as well as the number of files in the current directory.
-`df` shows the amount of free disk space remaining.
-Names starting with `lf_` show the value of environment variables exported by lf. This is useful for displaying the current settings (e.g. `lf_selmode` displays the current setting for the `selmode` option).
-User-defined options starting with `lf_user_` are also supported, so it is possible to display information set from external sources.
-
 ## rulerfmt (string) (default `  %a|  %p|  \033[7;31m %m \033[0m|  \033[7;33m %c \033[0m|  \033[7;35m %s \033[0m|  \033[7;34m %f \033[0m|  %i/%t`)
 
 Format string of the ruler shown in the bottom right corner.
@@ -1015,6 +998,11 @@ while a value of 0 will only show the end of the filename, e.g.:
 ## waitmsg (string) (default `Press any key to continue`)
 
 String shown after commands of shell-wait type.
+
+## watch (bool) (default false)
+
+Watch the filesystem for changes using `fsnotify` to automatically refresh file information.
+FUSE is currently not supported due to limitations in `fsnotify`.
 
 ## wrapscan (bool) (default true)
 
@@ -1134,6 +1122,14 @@ This shell command can be defined to be executed before changing a directory.
 ## on-cd
 
 This shell command can be defined to be executed after changing a directory.
+
+## on-focus-gained
+
+This shell command can be defined to be executed when the terminal gains focus.
+
+## on-focus-lost
+
+This shell command can be defined to be executed when the terminal loses focus.
 
 ## on-select
 
@@ -1800,6 +1796,7 @@ You may instead divide it into multiple lines in between double quotes by escapi
 	ex=01;32:\
 	"
 
+The `ln` entry supports the special value `target`, which will use the link target to select a style. File name rules will still apply based on the link's name -- this mirrors GNU's `ls` and `dircolors` behavior.
 Having such a long variable definition in a shell configuration file might be undesirable.
 You may instead use the colors file (refer to the [CONFIGURATION section](https://github.com/gokcehan/lf/blob/master/doc.md#configuration)) for configuration.
 A sample colors file can be found at
@@ -1812,7 +1809,9 @@ https://en.wikipedia.org/wiki/ANSI_escape_code
 Icons are configured using `LF_ICONS` environment variable or an icons file (refer to the [CONFIGURATION section](https://github.com/gokcehan/lf/blob/master/doc.md#configuration)).
 The variable uses the same syntax as `LS_COLORS/LF_COLORS`.
 Instead of colors, you should put a single characters as values of entries.
-The icons file (refer to the [CONFIGURATION section](https://github.com/gokcehan/lf/blob/master/doc.md#configuration)) should consist of whitespace-separated pairs with a `#` character to start comments until the end of the line.
+The `ln` entry supports the special value `target`, which will use the link target to select a icon. File name rules will still apply based on the link's name -- this mirrors GNU's `ls` and `dircolors` behavior.
+The icons file (refer to the [CONFIGURATION section](https://github.com/gokcehan/lf/blob/master/doc.md#configuration)) should consist of whitespace-separated arrays with a `#` character to start comments until the end of the line.
+Each line should contain 1-3 columns, first column is filetype or filename pattern, second column is the icon, third column is an optional icon color. If there is only one column, means to disable rule for this filetype or pattern.
 Do not forget to add `set icons true` to your `lfrc` to see the icons.
 Default values are as follows given with their matching order in lf:
 
@@ -1833,3 +1832,6 @@ Default values are as follows given with their matching order in lf:
 
 A sample icons file can be found at
 https://github.com/gokcehan/lf/blob/master/etc/icons.example
+
+A sample colored icons file can be found at
+https://github.com/gokcehan/lf/blob/master/etc/icons_colored.example

@@ -23,10 +23,11 @@ var (
 var envPathExt = os.Getenv("PATHEXT")
 
 var (
-	gDefaultShell      = "cmd"
-	gDefaultShellFlag  = "/c"
-	gDefaultSocketProt = "unix"
-	gDefaultSocketPath string
+	gDefaultShell       = "cmd"
+	gDefaultShellFlag   = "/c"
+	gDefaultSocketProt  = "unix"
+	gDefaultSocketPath  string
+	gDefaultHiddenFiles []string
 )
 
 var (
@@ -173,6 +174,19 @@ func isExecutable(f os.FileInfo) bool {
 }
 
 func isHidden(f os.FileInfo, path string, hiddenfiles []string) bool {
+	ptr, err := windows.UTF16PtrFromString(filepath.Join(path, f.Name()))
+	if err != nil {
+		return false
+	}
+	attrs, err := windows.GetFileAttributes(ptr)
+	if err != nil {
+		return false
+	}
+
+	if attrs&windows.FILE_ATTRIBUTE_HIDDEN != 0 {
+		return true
+	}
+
 	hidden := false
 	for _, pattern := range hiddenfiles {
 		matched := matchPattern(strings.TrimPrefix(pattern, "!"), f.Name(), path)
@@ -183,19 +197,7 @@ func isHidden(f os.FileInfo, path string, hiddenfiles []string) bool {
 		}
 	}
 
-	if hidden {
-		return true
-	}
-
-	ptr, err := windows.UTF16PtrFromString(filepath.Join(path, f.Name()))
-	if err != nil {
-		return false
-	}
-	attrs, err := windows.GetFileAttributes(ptr)
-	if err != nil {
-		return false
-	}
-	return attrs&windows.FILE_ATTRIBUTE_HIDDEN != 0
+	return hidden
 }
 
 func userName(f os.FileInfo) string {

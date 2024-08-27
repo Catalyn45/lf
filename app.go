@@ -36,6 +36,7 @@ type app struct {
 	menuComps      []string
 	menuCompInd    int
 	selectionOut   []string
+	watch          *watch
 }
 
 func newApp(ui *ui, nav *nav) *app {
@@ -46,6 +47,7 @@ func newApp(ui *ui, nav *nav) *app {
 		nav:      nav,
 		ticker:   new(time.Ticker),
 		quitChan: quitChan,
+		watch:    newWatch(nav.dirChan, nav.fileChan, nav.delChan),
 	}
 
 	sigChan := make(chan os.Signal, 1)
@@ -66,6 +68,8 @@ func newApp(ui *ui, nav *nav) *app {
 }
 
 func (app *app) quit() {
+	onQuit(app)
+
 	if gOpts.history {
 		if err := app.writeHistory(); err != nil {
 			log.Printf("writing history file: %s", err)
@@ -232,7 +236,7 @@ func (app *app) writeHistory() error {
 	}
 
 	for _, cmd := range app.cmdHistory {
-		_, err = f.WriteString(fmt.Sprintf("%s %s\n", cmd.prefix, cmd.value))
+		_, err = fmt.Fprintf(f, "%s %s\n", cmd.prefix, cmd.value)
 		if err != nil {
 			return fmt.Errorf("writing history file: %s", err)
 		}
@@ -322,10 +326,6 @@ func (app *app) loop() {
 				continue
 			}
 
-			if cmd, ok := gOpts.cmds["on-quit"]; ok {
-				cmd.eval(app, nil)
-			}
-
 			app.quit()
 
 			app.nav.previewChan <- ""
@@ -336,8 +336,8 @@ func (app *app) loop() {
 			return
 		case n := <-app.nav.copyBytesChan:
 			app.nav.copyBytes += n
-			// n is usually 4096B so update roughly per 4096B x 1024 = 4MB copied
-			if app.nav.copyUpdate++; app.nav.copyUpdate >= 1024 {
+			// n is usually 32*1024B (default io.Copy() buffer) so update roughly per 32KB x 128 = 4MB copied
+			if app.nav.copyUpdate++; app.nav.copyUpdate >= 128 {
 				app.nav.copyUpdate = 0
 				app.ui.draw(app.nav)
 			}
@@ -386,10 +386,17 @@ func (app *app) loop() {
 				if ok {
 					d.ind = prev.ind
 					d.pos = prev.pos
+					d.filter = prev.filter
+					d.sort()
 					d.sel(prev.name(), app.nav.height)
 				}
 
 				app.nav.dirCache[d.path] = d
+			}
+
+			var oldCurrPath string
+			if curr, err := app.nav.currFile(); err == nil {
+				oldCurrPath = curr.path
 			}
 
 			for i := range app.nav.dirs {
@@ -402,7 +409,7 @@ func (app *app) loop() {
 
 			curr, err := app.nav.currFile()
 			if err == nil {
-				if d.path == app.nav.currDir().path {
+				if curr.path != oldCurrPath {
 					app.ui.loadFile(app, true)
 					if app.ui.msgIsStat {
 						app.ui.loadFileInfo(app.nav)
@@ -412,6 +419,8 @@ func (app *app) loop() {
 					app.ui.dirPrev = d
 				}
 			}
+
+			app.setWatchPaths()
 
 			app.ui.draw(app.nav)
 		case r := <-app.nav.regChan:
@@ -425,6 +434,37 @@ func (app *app) loop() {
 			}
 
 			app.ui.draw(app.nav)
+		case f := <-app.nav.fileChan:
+			dirs := app.nav.dirs
+			if app.ui.dirPrev != nil {
+				dirs = append(dirs, app.ui.dirPrev)
+			}
+
+			for _, dir := range dirs {
+				if dir.path != filepath.Dir(f.path) {
+					continue
+				}
+
+				for i := range dir.allFiles {
+					if dir.allFiles[i].path == f.path {
+						dir.allFiles[i] = f
+						break
+					}
+				}
+
+				name := dir.name()
+				dir.sort()
+				dir.sel(name, app.nav.height)
+			}
+
+			app.ui.loadFile(app, false)
+			if app.ui.msgIsStat {
+				app.ui.loadFileInfo(app.nav)
+			}
+			app.ui.draw(app.nav)
+		case path := <-app.nav.delChan:
+			delete(app.nav.dirCache, path)
+			delete(app.nav.regCache, path)
 		case ev := <-app.ui.evChan:
 			e := app.ui.readEvent(ev, app.nav)
 			if e == nil {
@@ -454,7 +494,6 @@ func (app *app) loop() {
 		case <-app.ticker.C:
 			app.nav.renew()
 			app.ui.loadFile(app, false)
-			app.ui.draw(app.nav)
 		case <-app.nav.previewTimer.C:
 			app.nav.previewLoading = true
 			app.ui.draw(app.nav)
@@ -484,10 +523,6 @@ func (app *app) runCmdSync(cmd *exec.Cmd, pause_after bool) {
 	}
 
 	app.ui.loadFile(app, true)
-
-	//mark the current directory as updated for refresh
-	app.nav.currDir().updated = true
-
 	app.nav.renew()
 }
 
@@ -564,7 +599,6 @@ func (app *app) runShell(s string, args []string, prefix string) {
 		cmd.Stderr = os.Stderr
 
 		app.runCmdSync(cmd, prefix == "!")
-
 		return
 	}
 
@@ -636,5 +670,23 @@ func (app *app) runShell(s string, args []string, prefix string) {
 			app.ui.exprChan <- &callExpr{"load", nil, 1}
 		}()
 	}
+}
 
+func (app *app) setWatchPaths() {
+	if !gOpts.watch || len(app.nav.dirs) == 0 {
+		return
+	}
+
+	paths := make(map[string]bool)
+	for _, dir := range app.nav.dirs {
+		paths[dir.path] = true
+	}
+
+	for _, file := range app.nav.currDir().allFiles {
+		if file.IsDir() {
+			paths[file.path] = true
+		}
+	}
+
+	app.watch.set(paths)
 }

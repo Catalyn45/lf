@@ -30,78 +30,77 @@ func isValidSortMethod(method sortMethod) bool {
 const invalidSortErrorMessage = `sortby: value should either be 'natural', 'name', 'size', 'time', 'atime', 'ctime' or 'ext'`
 
 var gOpts struct {
-	anchorfind         bool
-	autoquit           bool
-	borderfmt          string
-	copyfmt            string
-	cursoractivefmt    string
-	cursorparentfmt    string
-	cursorpreviewfmt   string
-	cutfmt             string
-	hidecursorinactive bool
-	dircache           bool
-	dircounts          bool
-	dirfirst           bool
-	dironly            bool
-	dirpreviews        bool
-	drawbox            bool
-	dupfilefmt         string
-	globfilter         bool
-	globsearch         bool
-	hidden             bool
-	icons              bool
-	ignorecase         bool
-	ignoredia          bool
-	incfilter          bool
-	incsearch          bool
-	mouse              bool
-	number             bool
-	preview            bool
-	relativenumber     bool
-	reverse            bool
-	roundbox           bool
-	selectfmt          string
-	sixel              bool
-	sortby             sortMethod
-	smartcase          bool
-	smartdia           bool
-	waitmsg            string
-	wrapscan           bool
-	wrapscroll         bool
-	findlen            int
-	period             int
-	scrolloff          int
-	tabstop            int
-	errorfmt           string
-	filesep            string
-	ifs                string
-	previewer          string
-	cleaner            string
-	promptfmt          string
-	selmode            string
-	shell              string
-	shellflag          string
-	statfmt            string
-	timefmt            string
-	infotimefmtnew     string
-	infotimefmtold     string
-	truncatechar       string
-	truncatepct        int
-	ratios             []int
-	hiddenfiles        []string
-	history            bool
-	info               []string
-	ruler              []string
-	rulerfmt           string
-	preserve           []string
-	shellopts          []string
-	keys               map[string]expr
-	cmdkeys            map[string]expr
-	cmds               map[string]expr
-	user               map[string]string
-	tempmarks          string
-	numberfmt          string
-	tagfmt             string
+	anchorfind       bool
+	autoquit         bool
+	borderfmt        string
+	copyfmt          string
+	cursoractivefmt  string
+	cursorparentfmt  string
+	cursorpreviewfmt string
+	cutfmt           string
+	dircache         bool
+	dircounts        bool
+	dirfirst         bool
+	dironly          bool
+	dirpreviews      bool
+	drawbox          bool
+	dupfilefmt       string
+	globfilter       bool
+	globsearch       bool
+	hidden           bool
+	icons            bool
+	ignorecase       bool
+	ignoredia        bool
+	incfilter        bool
+	incsearch        bool
+	mouse            bool
+	number           bool
+	preview          bool
+	relativenumber   bool
+	reverse          bool
+	roundbox         bool
+	selectfmt        string
+	sixel            bool
+	sortby           sortMethod
+	smartcase        bool
+	smartdia         bool
+	waitmsg          string
+	watch            bool
+	wrapscan         bool
+	wrapscroll       bool
+	findlen          int
+	period           int
+	scrolloff        int
+	tabstop          int
+	errorfmt         string
+	filesep          string
+	ifs              string
+	previewer        string
+	cleaner          string
+	promptfmt        string
+	selmode          string
+	shell            string
+	shellflag        string
+	statfmt          string
+	timefmt          string
+	infotimefmtnew   string
+	infotimefmtold   string
+	truncatechar     string
+	truncatepct      int
+	ratios           []int
+	hiddenfiles      []string
+	history          bool
+	info             []string
+	rulerfmt         string
+	preserve         []string
+	shellopts        []string
+	keys             map[string]expr
+	cmdkeys          map[string]expr
+	cmds             map[string]expr
+	user             map[string]string
+	tempmarks        string
+	numberfmt        string
+	tagfmt           string
 }
 
 var gLocalOpts struct {
@@ -192,7 +191,6 @@ func init() {
 	gOpts.cursorparentfmt = "\033[7m"
 	gOpts.cursorpreviewfmt = "\033[4m"
 	gOpts.cutfmt = "\033[7;31m"
-	gOpts.hidecursorinactive = false
 	gOpts.globfilter = false
 	gOpts.globsearch = false
 	gOpts.hidden = false
@@ -213,6 +211,7 @@ func init() {
 	gOpts.smartcase = true
 	gOpts.smartdia = false
 	gOpts.waitmsg = "Press any key to continue"
+	gOpts.watch = false
 	gOpts.wrapscan = true
 	gOpts.wrapscroll = false
 	gOpts.findlen = 1
@@ -235,10 +234,9 @@ func init() {
 	gOpts.truncatechar = "~"
 	gOpts.truncatepct = 100
 	gOpts.ratios = []int{1, 2, 3}
-	gOpts.hiddenfiles = []string{".*"}
+	gOpts.hiddenfiles = gDefaultHiddenFiles
 	gOpts.history = true
 	gOpts.info = nil
-	gOpts.ruler = nil
 	gOpts.rulerfmt = "  %a|  %p|  \033[7;31m %m \033[0m|  \033[7;33m %c \033[0m|  \033[7;35m %s \033[0m|  \033[7;34m %f \033[0m|  %i/%t"
 	gOpts.preserve = []string{"mode"}
 	gOpts.shellopts = nil
@@ -290,7 +288,6 @@ func init() {
 	gOpts.keys["<c-r>"] = &callExpr{"reload", nil, 1}
 	gOpts.keys[":"] = &callExpr{"read", nil, 1}
 	gOpts.keys["$"] = &callExpr{"shell", nil, 1}
-	gOpts.keys["@"] = &callExpr{"direct", nil, 1}
 	gOpts.keys["%"] = &callExpr{"shell-pipe", nil, 1}
 	gOpts.keys["!"] = &callExpr{"shell-wait", nil, 1}
 	gOpts.keys["&"] = &callExpr{"shell-async", nil, 1}

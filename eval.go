@@ -114,8 +114,6 @@ func (e *setExpr) eval(app *app, args []string) {
 			app.ui.sort()
 			app.ui.loadFile(app, true)
 		}
-	case "hidecursorinactive", "nohidecursorinactive", "hidecursorinactive!":
-		err = applyBoolOpt(&gOpts.hidecursorinactive, e)
 	case "history", "nohistory", "history!":
 		err = applyBoolOpt(&gOpts.history, e)
 	case "icons", "noicons", "icons!":
@@ -189,6 +187,16 @@ func (e *setExpr) eval(app *app, args []string) {
 			app.ui.sort()
 			app.ui.loadFile(app, true)
 		}
+	case "watch", "nowatch", "watch!":
+		err = applyBoolOpt(&gOpts.watch, e)
+		if err == nil {
+			if gOpts.watch {
+				app.watch.start()
+				app.setWatchPaths()
+			} else {
+				app.watch.stop()
+			}
+		}
 	case "wrapscan", "nowrapscan", "wrapscan!":
 		err = applyBoolOpt(&gOpts.wrapscan, e)
 	case "wrapscroll", "nowrapscroll", "wrapscroll!":
@@ -259,25 +267,6 @@ func (e *setExpr) eval(app *app, args []string) {
 			}
 		}
 		gOpts.info = toks
-	case "ruler":
-		if e.val == "" {
-			gOpts.ruler = nil
-			return
-		}
-		toks := strings.Split(e.val, ":")
-		for _, s := range toks {
-			switch s {
-			case "df", "acc", "progress", "selection", "filter", "ind":
-			default:
-				if !strings.HasPrefix(s, "lf_") {
-					app.ui.echoerr("ruler: should consist of 'df', 'acc', 'progress', 'selection', 'filter', 'ind' or 'lf_<option_name>' separated with colon")
-					return
-				}
-			}
-		}
-		gOpts.ruler = toks
-		app.ui.echoerr("option 'ruler' is deprecated, use 'rulerfmt' instead")
-		return
 	case "rulerfmt":
 		gOpts.rulerfmt = e.val
 	case "preserve":
@@ -545,6 +534,18 @@ func (e *cmdExpr) eval(app *app, args []string) {
 	} else {
 		gOpts.cmds[e.name] = e.expr
 	}
+
+	// only enable focus reporting if required by the user
+	if e.name == "on-focus-gained" || e.name == "on-focus-lost" {
+		_, onFocusGainedExists := gOpts.cmds["on-focus-gained"]
+		_, onFocusLostExists := gOpts.cmds["on-focus-lost"]
+		if onFocusGainedExists || onFocusLostExists {
+			app.ui.screen.EnableFocus()
+		} else {
+			app.ui.screen.DisableFocus()
+		}
+	}
+
 	app.ui.loadFileInfo(app.nav)
 }
 
@@ -556,7 +557,20 @@ func preChdir(app *app) {
 
 func onChdir(app *app) {
 	app.nav.addJumpList()
+	app.setWatchPaths()
 	if cmd, ok := gOpts.cmds["on-cd"]; ok {
+		cmd.eval(app, nil)
+	}
+}
+
+func onFocusGained(app *app) {
+	if cmd, ok := gOpts.cmds["on-focus-gained"]; ok {
+		cmd.eval(app, nil)
+	}
+}
+
+func onFocusLost(app *app) {
+	if cmd, ok := gOpts.cmds["on-focus-lost"]; ok {
 		cmd.eval(app, nil)
 	}
 }
@@ -569,6 +583,12 @@ func onRedraw(app *app) {
 
 func onSelect(app *app) {
 	if cmd, ok := gOpts.cmds["on-select"]; ok {
+		cmd.eval(app, nil)
+	}
+}
+
+func onQuit(app *app) {
+	if cmd, ok := gOpts.cmds["on-quit"]; ok {
 		cmd.eval(app, nil)
 	}
 }
@@ -1330,7 +1350,6 @@ func (e *callExpr) eval(app *app, args []string) {
 				app.ui.cmdPrefix = "delete " + strconv.Itoa(len(list)) + " items? [y/N] "
 			}
 		}
-		app.ui.loadFile(app, true)
 		app.ui.loadFileInfo(app.nav)
 	case "clear":
 		if !app.nav.init {
@@ -1373,7 +1392,7 @@ func (e *callExpr) eval(app *app, args []string) {
 		app.ui.loadFile(app, true)
 		onRedraw(app)
 	case "load":
-		if !app.nav.init {
+		if !app.nav.init || gOpts.watch {
 			return
 		}
 		app.nav.renew()
@@ -1622,16 +1641,15 @@ func (e *callExpr) eval(app *app, args []string) {
 			}
 			normal(app)
 			app.ui.cmdPrefix = "rename: "
-			extension := filepath.Ext(curr.Name())
-			if len(extension) == 0 || extension == curr.Name() {
-				// no extension or .hidden
+			extension := getFileExtension(curr)
+			if len(extension) == 0 {
+				// no extension or .hidden or is directory
 				app.ui.cmdAccLeft = append(app.ui.cmdAccLeft, []rune(curr.Name())...)
 			} else {
 				app.ui.cmdAccLeft = append(app.ui.cmdAccLeft, []rune(curr.Name()[:len(curr.Name())-len(extension)])...)
 				app.ui.cmdAccRight = append(app.ui.cmdAccRight, []rune(extension)...)
 			}
 		}
-		app.ui.loadFile(app, true)
 		app.ui.loadFileInfo(app.nav)
 	case "sync":
 		if err := app.nav.sync(); err != nil {
@@ -1759,6 +1777,10 @@ func (e *callExpr) eval(app *app, args []string) {
 		for _, val := range splitKeys(e.args[0]) {
 			app.ui.keyChan <- val
 		}
+	case "on-focus-gained":
+		onFocusGained(app)
+	case "on-focus-lost":
+		onFocusLost(app)
 	case "cmd-insert":
 		if len(e.args) == 0 {
 			return
